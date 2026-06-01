@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink, Navigate, Route, Routes } from 'react-router-dom'
+import localforage from 'localforage'
 import '@fontsource/libre-baskerville/700.css'
 import '@fontsource/manrope/400.css'
 import '@fontsource/manrope/600.css'
@@ -85,6 +86,11 @@ const INITIAL_FORM = {
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const phoneRegex = /^[0-9+\-()\s]{7,20}$/
+
+const db = localforage.createInstance({
+  name: 'rsvp-react-app',
+  storeName: 'app_state',
+})
 
 const theme = createTheme({
   palette: {
@@ -209,6 +215,59 @@ function loadSettings() {
     }
   } catch {
     return DEFAULT_SETTINGS
+  }
+}
+
+async function hydratePersistedState() {
+  if (typeof window === 'undefined') {
+    return { submissions: [], settings: DEFAULT_SETTINGS }
+  }
+
+  let submissions = null
+  let settings = null
+
+  try {
+    submissions = await db.getItem(STORAGE_KEY)
+  } catch {
+    submissions = null
+  }
+
+  try {
+    settings = await db.getItem(SETTINGS_KEY)
+  } catch {
+    settings = null
+  }
+
+  const hydratedSubmissions = Array.isArray(submissions) ? submissions : loadSubmissions()
+  const hydratedSettings = settings && typeof settings === 'object'
+    ? {
+      ...DEFAULT_SETTINGS,
+      ...settings,
+      event: {
+        ...DEFAULT_SETTINGS.event,
+        ...(settings.event || {}),
+        schedule: Array.isArray(settings?.event?.schedule) ? settings.event.schedule : DEFAULT_SETTINGS.event.schedule,
+      },
+      invitedTokens: Array.isArray(settings?.invitedTokens) ? settings.invitedTokens : DEFAULT_SETTINGS.invitedTokens,
+    }
+    : loadSettings()
+
+  return { submissions: hydratedSubmissions, settings: hydratedSettings }
+}
+
+async function persistItem(key, value) {
+  if (typeof window === 'undefined') return
+
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // localStorage may be unavailable in restricted browser modes.
+  }
+
+  try {
+    await db.setItem(key, value)
+  } catch {
+    // Ignore IndexedDB failures to avoid breaking app flow.
   }
 }
 
@@ -872,17 +931,36 @@ function App() {
   const [submissions, setSubmissions] = useState(loadSubmissions)
   const [editLink, setEditLink] = useState('')
   const [now, setNow] = useState(() => Date.now())
+  const [hydrated, setHydrated] = useState(false)
   const deadlinePassed = now > new Date(settings.rsvpDeadline).getTime()
   const rsvpClosed = !settings.rsvpOpen || deadlinePassed
   const appUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : ''
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions))
-  }, [submissions])
+    let mounted = true
+
+    hydratePersistedState().then((data) => {
+      if (!mounted) return
+
+      setSubmissions(data.submissions)
+      setSettings(data.settings)
+      setHydrated(true)
+    })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-  }, [settings])
+    if (!hydrated) return
+    persistItem(STORAGE_KEY, submissions)
+  }, [submissions, hydrated])
+
+  useEffect(() => {
+    if (!hydrated) return
+    persistItem(SETTINGS_KEY, settings)
+  }, [settings, hydrated])
 
   useEffect(() => {
     const timer = setInterval(() => {
