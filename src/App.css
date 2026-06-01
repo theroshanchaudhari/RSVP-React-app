@@ -1,0 +1,125 @@
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+  color: #1a1a1a;
+}
+
+.hero,
+.panel {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fff;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5rem;
+}
+
+form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+input,
+select,
+textarea,
+button,
+a {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  padding: 0.55rem;
+  border-radius: 8px;
+  border: 1px solid #bfbfbf;
+}
+
+button,
+.cta-row a {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  background: #5d2de1;
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+iframe {
+  width: 100%;
+  min-height: 240px;
+  border: 0;
+  border-radius: 8px;
+  margin-top: 0.75rem;
+}
+
+.error {
+  color: #af1e2d;
+  font-weight: 600;
+}
+
+.success {
+  color: #176e2a;
+  font-weight: 600;
+}
+
+.edit-link {
+  word-break: break-word;
+}
+
+.honeypot {
+  position: absolute;
+  left: -9999px;
+}
+
+.stats {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.guest-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.guest-list article {
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  padding: 0.7rem;
+  background: #f7f7fb;
+}
+
+@media (min-width: 700px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
