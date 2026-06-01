@@ -34,6 +34,11 @@ npm install
 npm run dev
 ```
 
+After the app starts:
+
+- RSVP page: `http://localhost:5173/`
+- Admin dashboard: `http://localhost:5173/admin`
+
 ## Validate
 
 ```bash

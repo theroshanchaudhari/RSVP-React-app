@@ -1,5 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
-import './App.css'
+import { Link as RouterLink, Navigate, Route, Routes } from 'react-router-dom'
+import '@fontsource/libre-baskerville/700.css'
+import '@fontsource/manrope/400.css'
+import '@fontsource/manrope/600.css'
+import '@fontsource/manrope/700.css'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  CssBaseline,
+  Divider,
+  FormControl,
+  Grid,
+  InputLabel,
+  Link,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  TextField,
+  ThemeProvider,
+  Typography,
+  createTheme,
+} from '@mui/material'
 
 const STORAGE_KEY = 'rsvp_submissions_v1'
 const LAST_SUBMIT_KEY = 'rsvp_last_submit'
@@ -66,6 +93,54 @@ const INITIAL_FORM = {
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const phoneRegex = /^[0-9+\-()\s]{7,20}$/
+
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: { main: '#0f766e' },
+    secondary: { main: '#b45309' },
+    background: { default: '#f9f6ee', paper: '#fffdf8' },
+    text: { primary: '#1f2937', secondary: '#4b5563' },
+  },
+  shape: { borderRadius: 18 },
+  typography: {
+    fontFamily: 'Manrope, Segoe UI, sans-serif',
+    h1: {
+      fontFamily: 'Libre Baskerville, Georgia, serif',
+      fontWeight: 700,
+      letterSpacing: 0.3,
+    },
+    h2: {
+      fontFamily: 'Libre Baskerville, Georgia, serif',
+      fontWeight: 700,
+    },
+    h3: {
+      fontFamily: 'Libre Baskerville, Georgia, serif',
+      fontWeight: 700,
+    },
+  },
+  components: {
+    MuiButton: {
+      defaultProps: { variant: 'contained' },
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          borderRadius: 14,
+          fontWeight: 700,
+          paddingInline: 16,
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          border: '1px solid #e7e0d1',
+          boxShadow: '0 10px 30px rgba(30, 41, 59, 0.07)',
+        },
+      },
+    },
+  },
+})
 
 function toCsv(rows) {
   const escape = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`
@@ -138,42 +213,254 @@ function buildInitialForm() {
   return { ...INITIAL_FORM, token }
 }
 
-function App() {
-  const [lang, setLang] = useState('en')
-  const [form, setForm] = useState(buildInitialForm)
-  const [error, setError] = useState('')
-  const [confirmation, setConfirmation] = useState('')
-  const [submissions, setSubmissions] = useState(loadSubmissions)
+function DecorativeShell({ children }) {
+  return (
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background:
+          'radial-gradient(circle at 20% 10%, rgba(15,118,110,0.15) 0%, rgba(15,118,110,0) 28%), radial-gradient(circle at 85% 20%, rgba(180,83,9,0.17) 0%, rgba(180,83,9,0) 32%), linear-gradient(180deg, #fffaf0 0%, #f8f4e8 100%)',
+        pb: 6,
+      }}
+    >
+      {children}
+    </Box>
+  )
+}
+
+function RsvpPage({
+  lang,
+  setLang,
+  form,
+  error,
+  confirmation,
+  editLink,
+  deadlinePassed,
+  countdown,
+  appUrl,
+  updateField,
+  handleSubmit,
+}) {
+  const appText = TEXT[lang]
+  const whatsappShare = `https://wa.me/?text=${encodeURIComponent(`Please RSVP here: ${appUrl}`)}`
+  const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(EVENT.title)}&dates=20261225T053000Z/20261225T083000Z&details=${encodeURIComponent('RSVP Event')}&location=${encodeURIComponent(EVENT.venue)}`
+
+  return (
+    <DecorativeShell>
+      <Container maxWidth="lg" sx={{ pt: { xs: 3, md: 5 } }}>
+        <Card sx={{ mb: 3, overflow: 'hidden' }}>
+          <CardContent sx={{ p: { xs: 2.5, md: 4 } }}>
+            <Stack spacing={2.5}>
+              <Box>
+                <Typography variant="h1" sx={{ fontSize: { xs: '2.1rem', md: '3rem' }, lineHeight: 1.05 }}>
+                  {appText.heading}
+                </Typography>
+                <Typography color="text.secondary" sx={{ mt: 1 }}>
+                  {appText.subheading}
+                </Typography>
+              </Box>
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                <Button variant={lang === 'en' ? 'contained' : 'outlined'} onClick={() => setLang('en')}>English</Button>
+                <Button variant={lang === 'hi' ? 'contained' : 'outlined'} onClick={() => setLang('hi')}>Hindi</Button>
+                <Button variant={lang === 'gu' ? 'contained' : 'outlined'} onClick={() => setLang('gu')}>Gujarati</Button>
+              </Stack>
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
+                <Button component="a" href={whatsappShare} target="_blank" rel="noreferrer">Share on WhatsApp</Button>
+                <Button component="a" href={calendarLink} target="_blank" rel="noreferrer" variant="outlined">Add to Calendar</Button>
+                <Button component={RouterLink} to="/admin" color="secondary">Admin Dashboard</Button>
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Grid container spacing={2.5} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h2" sx={{ fontSize: { xs: '1.9rem', md: '2.3rem' }, mb: 1.5 }}>
+                  {appText.eventInfo}
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Date & Time: ${new Date(EVENT.dateTime).toLocaleString()}`} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Venue: ${EVENT.venue}`} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Dress Code: ${EVENT.dressCode}`} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`RSVP Deadline: ${new Date(RSVP_DEADLINE).toLocaleString()}`} /></Grid>
+                </Grid>
+                <Typography sx={{ mt: 2 }}><strong>Schedule:</strong> {EVENT.schedule.join(' | ')}</Typography>
+                <Typography color="text.secondary" sx={{ mt: 1 }}><strong>Parking:</strong> {EVENT.parking}</Typography>
+                <Alert severity="info" sx={{ mt: 2 }}>Countdown: {countdown}</Alert>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h3" sx={{ fontSize: '1.7rem', mb: 1.5 }}>
+                  Venue QR & Map
+                </Typography>
+                <Box sx={{ display: 'grid', placeItems: 'center', mb: 2 }}>
+                  <Box
+                    component="img"
+                    alt="Invitation QR Code"
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(appUrl)}`}
+                    sx={{ width: 180, height: 180, borderRadius: 2, border: '1px solid #e8e0d2' }}
+                  />
+                </Box>
+                <Box
+                  component="iframe"
+                  title="Venue map"
+                  src={EVENT.mapsEmbed}
+                  loading="lazy"
+                  sx={{ width: '100%', minHeight: 220, border: 0, borderRadius: 2 }}
+                />
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        <Card sx={{ mb: 3 }}>
+          <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            <Typography variant="h2" sx={{ fontSize: { xs: '1.9rem', md: '2.3rem' }, mb: 2 }}>
+              RSVP Form
+            </Typography>
+
+            {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+            {confirmation && <Alert severity="success" sx={{ mb: 1.5 }}>{confirmation}</Alert>}
+            {editLink && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Edit your RSVP later: <Link href={editLink}>{editLink}</Link>
+              </Alert>
+            )}
+
+            <Box component="form" onSubmit={handleSubmit}>
+              <Grid container spacing={1.5}>
+                {INVITE_ONLY && (
+                  <Grid size={{ xs: 12 }}>
+                    <TextField
+                      label="Invite token"
+                      value={form.token}
+                      onChange={(e) => updateField('token', e.target.value)}
+                      required
+                      fullWidth
+                    />
+                  </Grid>
+                )}
+
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField label="Guest name" value={form.name} onChange={(e) => updateField('name', e.target.value)} required fullWidth />
+                </Grid>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField label="Phone" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} required fullWidth />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField type="email" label="Email" value={form.email} onChange={(e) => updateField('email', e.target.value)} required fullWidth />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField type="number" label="Adults" inputProps={{ min: 0, max: 20 }} value={form.adults} onChange={(e) => updateField('adults', e.target.value)} required fullWidth />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField type="number" label="Children" inputProps={{ min: 0, max: 20 }} value={form.children} onChange={(e) => updateField('children', e.target.value)} required fullWidth />
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Attending</InputLabel>
+                    <Select
+                      value={form.attending}
+                      label="Attending"
+                      onChange={(e) => updateField('attending', e.target.value)}
+                    >
+                      <MenuItem value="yes">Attending</MenuItem>
+                      <MenuItem value="no">Not attending</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Meal preference</InputLabel>
+                    <Select value={form.meal} label="Meal preference" onChange={(e) => updateField('meal', e.target.value)}>
+                      <MenuItem value="veg">Vegetarian</MenuItem>
+                      <MenuItem value="non-veg">Non-vegetarian</MenuItem>
+                      <MenuItem value="jain">Jain</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid size={{ xs: 12 }}>
+                  <TextField label="Dietary restrictions" value={form.dietary} onChange={(e) => updateField('dietary', e.target.value)} fullWidth />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    type="time"
+                    label="Arrival time estimate"
+                    value={form.arrival}
+                    onChange={(e) => updateField('arrival', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    label="Optional message to host"
+                    multiline
+                    minRows={3}
+                    value={form.message}
+                    onChange={(e) => updateField('message', e.target.value)}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    label="Private notes (host use)"
+                    multiline
+                    minRows={2}
+                    value={form.notes}
+                    onChange={(e) => updateField('notes', e.target.value)}
+                    fullWidth
+                  />
+                </Grid>
+
+                <Box sx={{ position: 'absolute', left: -9999 }} aria-hidden="true">
+                  <TextField
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={form.honeypot}
+                    onChange={(e) => updateField('honeypot', e.target.value)}
+                  />
+                </Box>
+
+                <Grid size={{ xs: 12 }}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
+                    <Button type="submit" disabled={deadlinePassed}>Submit RSVP</Button>
+                    <Button component={Link} href={`mailto:${EVENT.hostEmail}`} variant="outlined">Contact Host</Button>
+                  </Stack>
+                </Grid>
+              </Grid>
+            </Box>
+          </CardContent>
+        </Card>
+
+        <Paper sx={{ p: { xs: 2, md: 3 }, border: '1px solid #e5ddcf' }}>
+          <Typography variant="h3" sx={{ fontSize: '1.7rem', mb: 1.2 }}>FAQ</Typography>
+          <Typography><strong>Can I edit my RSVP later?</strong> Yes, use your edit link after submission.</Typography>
+          <Typography sx={{ mt: 0.8 }}><strong>Can I contact host directly?</strong> Yes: {EVENT.contact}</Typography>
+          <Typography sx={{ mt: 0.8 }} color="text.secondary"><strong>Privacy notice:</strong> RSVP data is stored for event management and can be deleted after event day.</Typography>
+        </Paper>
+      </Container>
+    </DecorativeShell>
+  )
+}
+
+function AdminPage({ submissions, setSubmissions }) {
   const [adminOpen, setAdminOpen] = useState(false)
   const [adminPass, setAdminPass] = useState('')
+  const [adminError, setAdminError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [editLink, setEditLink] = useState('')
-
-  const appText = TEXT[lang]
-  const [now, setNow] = useState(() => Date.now())
-  const deadlinePassed = now > new Date(RSVP_DEADLINE).getTime()
-  const appUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : ''
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions))
-  }, [submissions])
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now())
-    }, 60000)
-
-    return () => clearInterval(timer)
-  }, [])
-
-  const countdown = useMemo(() => {
-    const ms = new Date(EVENT.dateTime).getTime() - now
-    if (ms <= 0) return 'Event has started.'
-    const days = Math.floor(ms / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((ms / (1000 * 60 * 60)) % 24)
-    return `${days} days ${hours} hours left`
-  }, [now])
 
   const filteredSubmissions = useMemo(() => {
     return submissions.filter((guest) => {
@@ -204,6 +491,172 @@ function App() {
       byMeal,
     }
   }, [submissions])
+
+  function openAdmin() {
+    if (adminPass === ADMIN_PASSWORD) {
+      setAdminOpen(true)
+      setAdminError('')
+      return
+    }
+    setAdminError('Invalid admin password.')
+  }
+
+  function exportCsv() {
+    const csv = toCsv(filteredSubmissions)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'rsvp-report.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function clearData() {
+    if (!window.confirm('Delete all RSVP data?')) return
+    setSubmissions([])
+    localStorage.removeItem(STORAGE_KEY)
+  }
+
+  return (
+    <DecorativeShell>
+      <Container maxWidth="lg" sx={{ pt: { xs: 3, md: 5 } }}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.2} sx={{ mb: 2 }}>
+              <Box>
+                <Typography variant="h2" sx={{ fontSize: { xs: '2rem', md: '2.4rem' } }}>Admin Access</Typography>
+                <Typography color="text.secondary">Separate route secured with password prompt.</Typography>
+              </Box>
+              <Button component={RouterLink} to="/" variant="outlined">Back to RSVP page</Button>
+            </Stack>
+
+            {adminError && <Alert severity="error" sx={{ mb: 2 }}>{adminError}</Alert>}
+
+            {!adminOpen ? (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2} alignItems="flex-start">
+                <TextField
+                  type="password"
+                  label="Admin password"
+                  value={adminPass}
+                  onChange={(e) => setAdminPass(e.target.value)}
+                />
+                <Button onClick={openAdmin}>Open Dashboard</Button>
+              </Stack>
+            ) : (
+              <Stack spacing={2}>
+                <Divider />
+                <Typography variant="h3" sx={{ fontSize: '1.9rem' }}>Dashboard</Typography>
+
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 6, md: 3 }}><Chip sx={{ width: '100%', py: 2.5 }} label={`Total RSVPs: ${summary.totalRsvps}`} /></Grid>
+                  <Grid size={{ xs: 6, md: 3 }}><Chip sx={{ width: '100%', py: 2.5 }} label={`Attending: ${summary.attendingCount}`} /></Grid>
+                  <Grid size={{ xs: 6, md: 3 }}><Chip sx={{ width: '100%', py: 2.5 }} label={`Adults: ${summary.adults}`} /></Grid>
+                  <Grid size={{ xs: 6, md: 3 }}><Chip sx={{ width: '100%', py: 2.5 }} label={`Children: ${summary.children}`} /></Grid>
+                </Grid>
+
+                <Alert severity="info">
+                  Meal summary:{' '}
+                  {Object.entries(summary.byMeal)
+                    .map(([meal, count]) => `${meal} (${count})`)
+                    .join(', ') || 'No meal selections yet.'}
+                </Alert>
+
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 12, md: 8 }}>
+                    <TextField
+                      fullWidth
+                      label="Search guests"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Name / Email / Phone"
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <FormControl fullWidth>
+                      <InputLabel>Filter by RSVP status</InputLabel>
+                      <Select value={statusFilter} label="Filter by RSVP status" onChange={(e) => setStatusFilter(e.target.value)}>
+                        <MenuItem value="all">All</MenuItem>
+                        <MenuItem value="yes">Attending</MenuItem>
+                        <MenuItem value="no">Not attending</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
+                  <Button onClick={exportCsv}>Export CSV</Button>
+                  <Button color="secondary" onClick={clearData}>Delete all data</Button>
+                </Stack>
+
+                <Grid container spacing={1.4}>
+                  {filteredSubmissions.map((guest) => (
+                    <Grid key={guest.id} size={{ xs: 12, md: 6 }}>
+                      <Paper sx={{ p: 1.6, border: '1px solid #e7e0d1', height: '100%' }}>
+                        <Typography sx={{ fontWeight: 700 }}>
+                          {guest.name} ({guest.attending === 'yes' ? 'Attending' : 'Not attending'})
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.4 }}>
+                          {guest.email} | {guest.phone}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.4 }}>
+                          Adults: {guest.adults}, Children: {guest.children}, Meal: {guest.meal}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.4 }}>
+                          Dietary: {guest.dietary || 'None'}, Arrival: {guest.arrival || '-'}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.4 }}>
+                          Submitted: {new Date(guest.submittedAt).toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.4 }}>
+                          Token: {guest.token}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.4 }}>
+                          Notes: {guest.notes || '-'}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Stack>
+            )}
+          </CardContent>
+        </Card>
+      </Container>
+    </DecorativeShell>
+  )
+}
+
+function App() {
+  const [lang, setLang] = useState('en')
+  const [form, setForm] = useState(buildInitialForm)
+  const [error, setError] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [submissions, setSubmissions] = useState(loadSubmissions)
+  const [editLink, setEditLink] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+  const deadlinePassed = now > new Date(RSVP_DEADLINE).getTime()
+  const appUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : ''
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions))
+  }, [submissions])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now())
+    }, 60000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  const countdown = useMemo(() => {
+    const ms = new Date(EVENT.dateTime).getTime() - now
+    if (ms <= 0) return 'Event has started.'
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((ms / (1000 * 60 * 60)) % 24)
+    return `${days} days ${hours} hours left`
+  }, [now])
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -282,226 +735,32 @@ function App() {
     setForm((prev) => ({ ...INITIAL_FORM, token: prev.token || token }))
   }
 
-  function openAdmin() {
-    if (adminPass === ADMIN_PASSWORD) {
-      setAdminOpen(true)
-      setError('')
-      return
-    }
-    setError('Invalid admin password.')
-  }
-
-  function exportCsv() {
-    const csv = toCsv(filteredSubmissions)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'rsvp-report.csv'
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  function clearData() {
-    if (!window.confirm('Delete all RSVP data?')) return
-    setSubmissions([])
-    localStorage.removeItem(STORAGE_KEY)
-  }
-
-  const whatsappShare = `https://wa.me/?text=${encodeURIComponent(`Please RSVP here: ${appUrl}`)}`
-  const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(EVENT.title)}&dates=20261225T053000Z/20261225T083000Z&details=${encodeURIComponent('RSVP Event')}&location=${encodeURIComponent(EVENT.venue)}`
-
   return (
-    <main className="app">
-      <header className="hero">
-        <h1>{appText.heading}</h1>
-        <p>{appText.subheading}</p>
-        <div className="cta-row">
-          <button type="button" onClick={() => setLang('en')}>English</button>
-          <button type="button" onClick={() => setLang('hi')}>हिंदी</button>
-          <button type="button" onClick={() => setLang('gu')}>ગુજરાતી</button>
-        </div>
-      </header>
-
-      <section className="panel">
-        <h2>{appText.eventInfo}</h2>
-        <p><strong>Date & Time:</strong> {new Date(EVENT.dateTime).toLocaleString()}</p>
-        <p><strong>Venue:</strong> {EVENT.venue}</p>
-        <p><strong>Dress Code:</strong> {EVENT.dressCode}</p>
-        <p><strong>Parking:</strong> {EVENT.parking}</p>
-        <p><strong>Schedule:</strong> {EVENT.schedule.join(' | ')}</p>
-        <p><strong>RSVP Deadline:</strong> {new Date(RSVP_DEADLINE).toLocaleString()}</p>
-        <p><strong>Countdown:</strong> {countdown}</p>
-        <div className="cta-row">
-          <a href={whatsappShare} target="_blank" rel="noreferrer">Share via WhatsApp</a>
-          <a href={calendarLink} target="_blank" rel="noreferrer">Add to Calendar</a>
-        </div>
-        <img
-          alt="Invitation QR Code"
-          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(appUrl)}`}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <RsvpPage
+              lang={lang}
+              setLang={setLang}
+              form={form}
+              error={error}
+              confirmation={confirmation}
+              editLink={editLink}
+              deadlinePassed={deadlinePassed}
+              countdown={countdown}
+              appUrl={appUrl}
+              updateField={updateField}
+              handleSubmit={handleSubmit}
+            />
+          }
         />
-        <iframe title="Venue map" src={EVENT.mapsEmbed} loading="lazy" />
-      </section>
-
-      <section className="panel">
-        <h2>RSVP Form</h2>
-        {error && <p className="error" role="alert">{error}</p>}
-        {confirmation && <p className="success">{confirmation}</p>}
-        {editLink && <p className="edit-link">Edit your RSVP later: <a href={editLink}>{editLink}</a></p>}
-
-        <form onSubmit={handleSubmit}>
-          {INVITE_ONLY && (
-            <label>
-              Invite token
-              <input value={form.token} onChange={(e) => updateField('token', e.target.value)} required />
-            </label>
-          )}
-          <label>
-            Guest name
-            <input value={form.name} onChange={(e) => updateField('name', e.target.value)} required />
-          </label>
-          <label>
-            Phone
-            <input value={form.phone} onChange={(e) => updateField('phone', e.target.value)} required />
-          </label>
-          <label>
-            Email
-            <input type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} required />
-          </label>
-
-          <div className="grid-2">
-            <label>
-              Adults
-              <input type="number" min="0" max="20" value={form.adults} onChange={(e) => updateField('adults', e.target.value)} required />
-            </label>
-            <label>
-              Children
-              <input type="number" min="0" max="20" value={form.children} onChange={(e) => updateField('children', e.target.value)} required />
-            </label>
-          </div>
-
-          <label>
-            Attending
-            <select value={form.attending} onChange={(e) => updateField('attending', e.target.value)}>
-              <option value="yes">Attending</option>
-              <option value="no">Not attending</option>
-            </select>
-          </label>
-
-          <label>
-            Meal preference
-            <select value={form.meal} onChange={(e) => updateField('meal', e.target.value)}>
-              <option value="veg">Vegetarian</option>
-              <option value="non-veg">Non-vegetarian</option>
-              <option value="jain">Jain</option>
-            </select>
-          </label>
-
-          <label>
-            Dietary restrictions
-            <input value={form.dietary} onChange={(e) => updateField('dietary', e.target.value)} />
-          </label>
-
-          <label>
-            Arrival time estimate
-            <input type="time" value={form.arrival} onChange={(e) => updateField('arrival', e.target.value)} />
-          </label>
-
-          <label>
-            Optional message to host
-            <textarea rows="3" value={form.message} onChange={(e) => updateField('message', e.target.value)} />
-          </label>
-
-          <label>
-            Private notes (host use)
-            <textarea rows="2" value={form.notes} onChange={(e) => updateField('notes', e.target.value)} />
-          </label>
-
-          <label className="honeypot" aria-hidden="true">
-            Leave this field empty
-            <input tabIndex="-1" autoComplete="off" value={form.honeypot} onChange={(e) => updateField('honeypot', e.target.value)} />
-          </label>
-
-          <button type="submit" disabled={deadlinePassed}>{appText.submit}</button>
-        </form>
-
-        <p>
-          Confirmation emails/SMS are typically sent by backend integrations. You can notify host now at{' '}
-          <a href={`mailto:${EVENT.hostEmail}`}>{EVENT.hostEmail}</a>.
-        </p>
-      </section>
-
-      <section className="panel">
-        <h2>Admin Access</h2>
-        {!adminOpen ? (
-          <div className="admin-lock">
-            <label>
-              Admin password
-              <input type="password" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} />
-            </label>
-            <button type="button" onClick={openAdmin}>Open Dashboard</button>
-          </div>
-        ) : (
-          <>
-            <h3>{appText.dashboard}</h3>
-            <div className="stats">
-              <p>Total RSVPs: {summary.totalRsvps}</p>
-              <p>Attending RSVPs: {summary.attendingCount}</p>
-              <p>Total Adults: {summary.adults}</p>
-              <p>Total Children: {summary.children}</p>
-            </div>
-
-            <p>
-              Meal summary:{' '}
-              {Object.entries(summary.byMeal)
-                .map(([meal, count]) => `${meal} (${count})`)
-                .join(', ') || 'No meal selections yet.'}
-            </p>
-
-            <div className="grid-2">
-              <label>
-                Search guests
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name / Email / Phone" />
-              </label>
-              <label>
-                Filter by RSVP status
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option value="all">All</option>
-                  <option value="yes">Attending</option>
-                  <option value="no">Not attending</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="cta-row">
-              <button type="button" onClick={exportCsv}>Export CSV</button>
-              <button type="button" onClick={clearData}>Delete all data</button>
-            </div>
-
-            <div className="guest-list">
-              {filteredSubmissions.map((guest) => (
-                <article key={guest.id}>
-                  <p><strong>{guest.name}</strong> ({guest.attending === 'yes' ? 'Attending' : 'Not attending'})</p>
-                  <p>{guest.email} | {guest.phone}</p>
-                  <p>Adults: {guest.adults}, Children: {guest.children}, Meal: {guest.meal}</p>
-                  <p>Dietary: {guest.dietary || 'None'}, Arrival: {guest.arrival || '-'}</p>
-                  <p>Submitted: {new Date(guest.submittedAt).toLocaleString()}</p>
-                  <p>Token: {guest.token}</p>
-                  <p>Notes: {guest.notes || '-'}</p>
-                </article>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      <section className="panel">
-        <h2>FAQ</h2>
-        <p><strong>Can I edit my RSVP later?</strong> Yes, use your edit link after submission.</p>
-        <p><strong>Can I contact host directly?</strong> Yes: {EVENT.contact}</p>
-        <p><strong>Privacy notice:</strong> RSVP data is stored for event management and can be deleted after event day.</p>
-      </section>
-    </main>
+        <Route path="/admin" element={<AdminPage submissions={submissions} setSubmissions={setSubmissions} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ThemeProvider>
   )
 }
 
