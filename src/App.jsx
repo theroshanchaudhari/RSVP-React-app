@@ -15,6 +15,7 @@ import {
   CssBaseline,
   Divider,
   FormControl,
+  FormControlLabel,
   Grid,
   InputLabel,
   Link,
@@ -22,6 +23,7 @@ import {
   Paper,
   Select,
   Stack,
+  Switch,
   TextField,
   ThemeProvider,
   Typography,
@@ -29,25 +31,29 @@ import {
 } from '@mui/material'
 
 const STORAGE_KEY = 'rsvp_submissions_v1'
+const SETTINGS_KEY = 'rsvp_settings_v1'
 const LAST_SUBMIT_KEY = 'rsvp_last_submit'
 const SUBMIT_COOLDOWN_MS = 10000
 const ADMIN_PASSWORD = 'host123'
-const RSVP_DEADLINE = '2026-12-10T23:59:59'
-const MAX_CAPACITY = 200
-const INVITE_ONLY = false
-const INVITED_TOKENS = ['FAMILY-001', 'FAMILY-002', 'FAMILY-003']
-
-const EVENT = {
-  title: 'Family Wedding RSVP',
-  dateTime: '2026-12-25T11:00:00',
-  schedule: ['10:00 AM Puja', '12:00 PM Lunch', '2:00 PM Blessings & Photos'],
-  venue: 'Shree Hall, Ahmedabad',
-  mapsEmbed:
-    'https://www.google.com/maps?q=Ahmedabad&output=embed',
-  parking: 'Free parking is available behind the venue gate.',
-  dressCode: 'Traditional festive attire',
-  contact: '+91 99999 99999',
-  hostEmail: 'host@example.com',
+const DEFAULT_SETTINGS = {
+  event: {
+    title: 'Family Wedding RSVP',
+    dateTime: '2026-12-25T11:00:00',
+    schedule: ['10:00 AM Puja', '12:00 PM Lunch', '2:00 PM Blessings & Photos'],
+    venue: '22 Duncairn Ave, Kitchener ON N2M 4S4',
+    mapsEmbed:
+      'https://www.google.com/maps/place/22+duncairn+ave+kitchener+ontario+n2m+4s4/@43.4240644,-80.505863,3a,75y,153.73h,90t/data=!3m4!1e1!3m2!1setfSPXOh2dtB5ios5pMkCA!2e0!4m2!3m1!1s0x882bf5a5e8eb6b05:0x6d777697648c373f?sa=X&ved=1t:3780&ictx=111',
+    parking: 'You may park on street.',
+    dressCode: 'Traditional',
+    contact: '+1 226 507 7565',
+    hostEmail: 'theroshanchaudhari@gmail.com',
+  },
+  rsvpOpen: true,
+  rsvpDeadline: '2026-12-10T23:59:59',
+  maxCapacity: 200,
+  inviteOnly: false,
+  invitedTokens: ['FAMILY-001', 'FAMILY-002', 'FAMILY-003'],
+  confirmationMessage: 'Thank you! Your RSVP has been recorded.',
 }
 
 const TEXT = {
@@ -57,21 +63,7 @@ const TEXT = {
     submit: 'Submit RSVP',
     dashboard: 'Admin Dashboard',
     eventInfo: 'Event Information',
-  },
-  hi: {
-    heading: 'कृपया RSVP करें',
-    subheading: 'कृपया बताएं कि आप आ पाएंगे या नहीं।',
-    submit: 'RSVP भेजें',
-    dashboard: 'एडमिन डैशबोर्ड',
-    eventInfo: 'कार्यक्रम जानकारी',
-  },
-  gu: {
-    heading: 'કૃપા કરીને RSVP કરો',
-    subheading: 'તમે હાજર રહી શકશો કે નહીં તે જણાવો.',
-    submit: 'RSVP મોકલો',
-    dashboard: 'એડમિન ડેશબોર્ડ',
-    eventInfo: 'ઈવેન્ટ માહિતી',
-  },
+  }
 }
 
 const INITIAL_FORM = {
@@ -197,6 +189,48 @@ function loadSubmissions() {
   }
 }
 
+function loadSettings() {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS
+
+  const raw = localStorage.getItem(SETTINGS_KEY)
+  if (!raw) return DEFAULT_SETTINGS
+
+  try {
+    const parsed = JSON.parse(raw)
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      event: {
+        ...DEFAULT_SETTINGS.event,
+        ...(parsed?.event || {}),
+        schedule: Array.isArray(parsed?.event?.schedule) ? parsed.event.schedule : DEFAULT_SETTINGS.event.schedule,
+      },
+      invitedTokens: Array.isArray(parsed?.invitedTokens) ? parsed.invitedTokens : DEFAULT_SETTINGS.invitedTokens,
+    }
+  } catch {
+    return DEFAULT_SETTINGS
+  }
+}
+
+function toDateTimeLocal(value) {
+  const dt = new Date(value)
+  if (Number.isNaN(dt.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  const y = dt.getFullYear()
+  const m = pad(dt.getMonth() + 1)
+  const d = pad(dt.getDate())
+  const h = pad(dt.getHours())
+  const min = pad(dt.getMinutes())
+  return `${y}-${m}-${d}T${h}:${min}`
+}
+
+function fromDateTimeLocal(value, fallback) {
+  if (!value) return fallback
+  const dt = new Date(value)
+  if (Number.isNaN(dt.getTime())) return fallback
+  return dt.toISOString()
+}
+
 function buildInitialForm() {
   if (typeof window === 'undefined') return INITIAL_FORM
 
@@ -211,6 +245,39 @@ function buildInitialForm() {
   }
 
   return { ...INITIAL_FORM, token }
+}
+
+function buildMapEmbedUrl(mapUrl, fallbackAddress) {
+  const fallback = `https://www.google.com/maps?q=${encodeURIComponent(fallbackAddress)}&output=embed`
+
+  if (!mapUrl) return fallback
+
+  try {
+    const parsed = new URL(mapUrl)
+    const host = parsed.hostname.toLowerCase()
+    const isGoogleMaps = host.includes('google.')
+
+    if (isGoogleMaps) {
+      if (parsed.pathname.includes('/maps/embed') || parsed.searchParams.get('output') === 'embed') {
+        return parsed.toString()
+      }
+
+      const placeSegment = parsed.pathname.match(/\/maps\/place\/([^/]+)/)
+      if (placeSegment?.[1]) {
+        const placeText = decodeURIComponent(placeSegment[1]).replaceAll('+', ' ')
+        return `https://www.google.com/maps?q=${encodeURIComponent(placeText)}&output=embed`
+      }
+
+      const query = parsed.searchParams.get('q') || parsed.searchParams.get('query')
+      if (query) {
+        return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
+      }
+    }
+  } catch {
+    // Fall back to direct address embed URL when parsing fails.
+  }
+
+  return fallback
 }
 
 function DecorativeShell({ children }) {
@@ -230,11 +297,12 @@ function DecorativeShell({ children }) {
 
 function RsvpPage({
   lang,
-  setLang,
+  settings,
   form,
   error,
   confirmation,
   editLink,
+  rsvpClosed,
   deadlinePassed,
   countdown,
   appUrl,
@@ -243,7 +311,8 @@ function RsvpPage({
 }) {
   const appText = TEXT[lang]
   const whatsappShare = `https://wa.me/?text=${encodeURIComponent(`Please RSVP here: ${appUrl}`)}`
-  const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(EVENT.title)}&dates=20261225T053000Z/20261225T083000Z&details=${encodeURIComponent('RSVP Event')}&location=${encodeURIComponent(EVENT.venue)}`
+  const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(settings.event.title)}&details=${encodeURIComponent('RSVP Event')}&location=${encodeURIComponent(settings.event.venue)}`
+  const mapEmbedUrl = buildMapEmbedUrl(settings.event.mapsEmbed, settings.event.venue)
 
   return (
     <DecorativeShell>
@@ -262,8 +331,7 @@ function RsvpPage({
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
                 <Button component="a" href={whatsappShare} target="_blank" rel="noreferrer">Share on WhatsApp</Button>
-                {/* <Button component="a" href={calendarLink} target="_blank" rel="noreferrer" variant="outlined">Add to Calendar</Button>
-                <Button component={RouterLink} to="/admin" color="secondary">Admin Dashboard</Button> */}
+                <Button component="a" href={calendarLink} target="_blank" rel="noreferrer" variant="outlined">Add to Calendar</Button>
               </Stack>
             </Stack>
           </CardContent>
@@ -277,14 +345,16 @@ function RsvpPage({
                   {appText.eventInfo}
                 </Typography>
                 <Grid container spacing={1.5}>
-                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Date & Time: ${new Date(EVENT.dateTime).toLocaleString()}`} /></Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Venue: ${EVENT.venue}`} /></Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Dress Code: ${EVENT.dressCode}`} /></Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`RSVP Deadline: ${new Date(RSVP_DEADLINE).toLocaleString()}`} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Date & Time: ${new Date(settings.event.dateTime).toLocaleString()}`} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Venue: ${settings.event.venue}`} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`Dress Code: ${settings.event.dressCode}`} /></Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}><Chip label={`RSVP Deadline: ${new Date(settings.rsvpDeadline).toLocaleString()}`} /></Grid>
                 </Grid>
-                <Typography sx={{ mt: 2 }}><strong>Schedule:</strong> {EVENT.schedule.join(' | ')}</Typography>
-                <Typography color="text.secondary" sx={{ mt: 1 }}><strong>Parking:</strong> {EVENT.parking}</Typography>
+                <Typography sx={{ mt: 2 }}><strong>Schedule:</strong> {settings.event.schedule.join(' | ')}</Typography>
+                <Typography color="text.secondary" sx={{ mt: 1 }}><strong>Parking:</strong> {settings.event.parking}</Typography>
                 <Alert severity="info" sx={{ mt: 2 }}>Countdown: {countdown}</Alert>
+                {!settings.rsvpOpen && <Alert severity="warning" sx={{ mt: 1.2 }}>RSVP is currently closed by host.</Alert>}
+                {deadlinePassed && <Alert severity="warning" sx={{ mt: 1.2 }}>RSVP deadline has passed.</Alert>}
               </CardContent>
             </Card>
           </Grid>
@@ -293,20 +363,12 @@ function RsvpPage({
             <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h3" sx={{ fontSize: '1.7rem', mb: 1.5 }}>
-                  Venue QR & Map
+                  Venue Map
                 </Typography>
-                <Box sx={{ display: 'grid', placeItems: 'center', mb: 2 }}>
-                  <Box
-                    component="img"
-                    alt="Invitation QR Code"
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(appUrl)}`}
-                    sx={{ width: 180, height: 180, borderRadius: 2, border: '1px solid #e8e0d2' }}
-                  />
-                </Box>
                 <Box
                   component="iframe"
                   title="Venue map"
-                  src={EVENT.mapsEmbed}
+                  src={mapEmbedUrl}
                   loading="lazy"
                   sx={{ width: '100%', minHeight: 220, border: 0, borderRadius: 2 }}
                 />
@@ -331,7 +393,7 @@ function RsvpPage({
 
             <Box component="form" onSubmit={handleSubmit}>
               <Grid container spacing={1.5}>
-                {INVITE_ONLY && (
+                {settings.inviteOnly && (
                   <Grid size={{ xs: 12 }}>
                     <TextField
                       label="Invite token"
@@ -387,36 +449,6 @@ function RsvpPage({
                 <Grid size={{ xs: 12 }}>
                   <TextField label="Dietary restrictions" value={form.dietary} onChange={(e) => updateField('dietary', e.target.value)} fullWidth />
                 </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    type="time"
-                    label="Arrival time estimate"
-                    value={form.arrival}
-                    onChange={(e) => updateField('arrival', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    label="Optional message to host"
-                    multiline
-                    minRows={3}
-                    value={form.message}
-                    onChange={(e) => updateField('message', e.target.value)}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    label="Private notes (host use)"
-                    multiline
-                    minRows={2}
-                    value={form.notes}
-                    onChange={(e) => updateField('notes', e.target.value)}
-                    fullWidth
-                  />
-                </Grid>
 
                 <Box sx={{ position: 'absolute', left: -9999 }} aria-hidden="true">
                   <TextField
@@ -429,8 +461,8 @@ function RsvpPage({
 
                 <Grid size={{ xs: 12 }}>
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
-                    <Button type="submit" disabled={deadlinePassed}>Submit RSVP</Button>
-                    <Button component={Link} href={`mailto:${EVENT.hostEmail}`} variant="outlined">Contact Host</Button>
+                    <Button type="submit" disabled={rsvpClosed}>{appText.submit}</Button>
+                    <Button component={Link} href={`mailto:${settings.event.hostEmail}`} variant="outlined">Contact Host</Button>
                   </Stack>
                 </Grid>
               </Grid>
@@ -441,7 +473,7 @@ function RsvpPage({
         <Paper sx={{ p: { xs: 2, md: 3 }, border: '1px solid #e5ddcf' }}>
           <Typography variant="h3" sx={{ fontSize: '1.7rem', mb: 1.2 }}>FAQ</Typography>
           <Typography><strong>Can I edit my RSVP later?</strong> Yes, use your edit link after submission.</Typography>
-          <Typography sx={{ mt: 0.8 }}><strong>Can I contact host directly?</strong> Yes: {EVENT.contact}</Typography>
+          <Typography sx={{ mt: 0.8 }}><strong>Can I contact host directly?</strong> Yes: {settings.event.contact}</Typography>
           <Typography sx={{ mt: 0.8 }} color="text.secondary"><strong>Privacy notice:</strong> RSVP data is stored for event management and can be deleted after event day.</Typography>
         </Paper>
       </Container>
@@ -449,12 +481,14 @@ function RsvpPage({
   )
 }
 
-function AdminPage({ submissions, setSubmissions }) {
+function AdminPage({ submissions, setSubmissions, settings, setSettings }) {
   const [adminOpen, setAdminOpen] = useState(false)
   const [adminPass, setAdminPass] = useState('')
   const [adminError, setAdminError] = useState('')
+  const [saveStatus, setSaveStatus] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [settingsDraft, setSettingsDraft] = useState(settings)
 
   const filteredSubmissions = useMemo(() => {
     return submissions.filter((guest) => {
@@ -495,6 +529,33 @@ function AdminPage({ submissions, setSubmissions }) {
     setAdminError('Invalid admin password.')
   }
 
+  function updateDraftEvent(field, value) {
+    setSettingsDraft((prev) => ({
+      ...prev,
+      event: {
+        ...prev.event,
+        [field]: value,
+      },
+    }))
+  }
+
+  function saveSettings() {
+    const normalizedCapacity = Math.max(1, Number(settingsDraft.maxCapacity) || 1)
+    const normalizedSchedule = settingsDraft.event.schedule.filter((item) => item.trim())
+    const normalizedTokens = settingsDraft.invitedTokens.filter((item) => item.trim())
+
+    setSettings({
+      ...settingsDraft,
+      maxCapacity: normalizedCapacity,
+      invitedTokens: normalizedTokens,
+      event: {
+        ...settingsDraft.event,
+        schedule: normalizedSchedule.length ? normalizedSchedule : DEFAULT_SETTINGS.event.schedule,
+      },
+    })
+    setSaveStatus('Settings saved successfully.')
+  }
+
   function exportCsv() {
     const csv = toCsv(filteredSubmissions)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -522,7 +583,20 @@ function AdminPage({ submissions, setSubmissions }) {
                 <Typography variant="h2" sx={{ fontSize: { xs: '2rem', md: '2.4rem' } }}>Admin Access</Typography>
                 <Typography color="text.secondary">Separate route secured with password prompt.</Typography>
               </Box>
-              <Button component={RouterLink} to="/" variant="outlined">Back to RSVP page</Button>
+              <Button
+                component={RouterLink}
+                to="/"
+                variant="outlined"
+                sx={{
+                  whiteSpace: 'nowrap',
+                  alignSelf: { xs: 'flex-start', sm: 'center' },
+                  px: { sm: 2 },
+                  py: { sm: 0.75 },
+                  fontSize: { sm: '0.9rem' },
+                }}
+              >
+                Back to RSVP page
+              </Button>
             </Stack>
 
             {adminError && <Alert severity="error" sx={{ mb: 2 }}>{adminError}</Alert>}
@@ -541,6 +615,174 @@ function AdminPage({ submissions, setSubmissions }) {
               <Stack spacing={2}>
                 <Divider />
                 <Typography variant="h3" sx={{ fontSize: '1.9rem' }}>Dashboard</Typography>
+
+                {saveStatus && <Alert severity="success">{saveStatus}</Alert>}
+
+                <Card variant="outlined" sx={{ borderColor: '#dacfb8' }}>
+                  <CardContent>
+                    <Typography variant="h3" sx={{ fontSize: '1.5rem', mb: 1.2 }}>Event & RSVP Settings</Typography>
+                    <Grid container spacing={1.3}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Event title"
+                          value={settingsDraft.event.title}
+                          onChange={(e) => updateDraftEvent('title', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Venue address"
+                          value={settingsDraft.event.venue}
+                          onChange={(e) => updateDraftEvent('venue', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          type="datetime-local"
+                          label="Event date & time"
+                          value={toDateTimeLocal(settingsDraft.event.dateTime)}
+                          onChange={(e) => updateDraftEvent('dateTime', fromDateTimeLocal(e.target.value, settingsDraft.event.dateTime))}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          type="datetime-local"
+                          label="RSVP deadline"
+                          value={toDateTimeLocal(settingsDraft.rsvpDeadline)}
+                          onChange={(e) => setSettingsDraft((prev) => ({
+                            ...prev,
+                            rsvpDeadline: fromDateTimeLocal(e.target.value, prev.rsvpDeadline),
+                          }))}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="Max guest capacity"
+                          inputProps={{ min: 1 }}
+                          value={settingsDraft.maxCapacity}
+                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, maxCapacity: e.target.value }))}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Google Maps link"
+                          value={settingsDraft.event.mapsEmbed}
+                          onChange={(e) => updateDraftEvent('mapsEmbed', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Parking instructions"
+                          value={settingsDraft.event.parking}
+                          onChange={(e) => updateDraftEvent('parking', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Dress code"
+                          value={settingsDraft.event.dressCode}
+                          onChange={(e) => updateDraftEvent('dressCode', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Host contact number"
+                          value={settingsDraft.event.contact}
+                          onChange={(e) => updateDraftEvent('contact', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Host email"
+                          value={settingsDraft.event.hostEmail}
+                          onChange={(e) => updateDraftEvent('hostEmail', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          multiline
+                          minRows={3}
+                          label="Schedule (one line per item)"
+                          value={settingsDraft.event.schedule.join('\n')}
+                          onChange={(e) => updateDraftEvent('schedule', e.target.value.split('\n').map((item) => item.trim()))}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          multiline
+                          minRows={3}
+                          label="Custom confirmation message"
+                          value={settingsDraft.confirmationMessage}
+                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, confirmationMessage: e.target.value }))}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          multiline
+                          minRows={2}
+                          label="Invite-only tokens (comma separated)"
+                          value={settingsDraft.invitedTokens.join(', ')}
+                          onChange={(e) => setSettingsDraft((prev) => ({
+                            ...prev,
+                            invitedTokens: e.target.value.split(',').map((item) => item.trim()),
+                          }))}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={settingsDraft.rsvpOpen}
+                              onChange={(e) => setSettingsDraft((prev) => ({ ...prev, rsvpOpen: e.target.checked }))}
+                            />
+                          }
+                          label="RSVP open"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={settingsDraft.inviteOnly}
+                              onChange={(e) => setSettingsDraft((prev) => ({ ...prev, inviteOnly: e.target.checked }))}
+                            />
+                          }
+                          label="Invite-only mode"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
+                          <Button onClick={saveSettings}>Save Settings</Button>
+                          <Button
+                            variant="outlined"
+                            onClick={() => {
+                              setSettingsDraft(DEFAULT_SETTINGS)
+                              setSaveStatus('')
+                            }}
+                          >
+                            Reset Draft
+                          </Button>
+                        </Stack>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
 
                 <Grid container spacing={1.5}>
                   <Grid size={{ xs: 6, md: 3 }}><Chip sx={{ width: '100%', py: 2.5 }} label={`Total RSVPs: ${summary.totalRsvps}`} /></Grid>
@@ -622,19 +864,25 @@ function AdminPage({ submissions, setSubmissions }) {
 }
 
 function App() {
-  const [lang, setLang] = useState('en')
+  const lang = 'en'
+  const [settings, setSettings] = useState(loadSettings)
   const [form, setForm] = useState(buildInitialForm)
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [submissions, setSubmissions] = useState(loadSubmissions)
   const [editLink, setEditLink] = useState('')
   const [now, setNow] = useState(() => Date.now())
-  const deadlinePassed = now > new Date(RSVP_DEADLINE).getTime()
+  const deadlinePassed = now > new Date(settings.rsvpDeadline).getTime()
+  const rsvpClosed = !settings.rsvpOpen || deadlinePassed
   const appUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : ''
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions))
   }, [submissions])
+
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+  }, [settings])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -645,24 +893,25 @@ function App() {
   }, [])
 
   const countdown = useMemo(() => {
-    const ms = new Date(EVENT.dateTime).getTime() - now
+    const ms = new Date(settings.event.dateTime).getTime() - now
     if (ms <= 0) return 'Event has started.'
     const days = Math.floor(ms / (1000 * 60 * 60 * 24))
     const hours = Math.floor((ms / (1000 * 60 * 60)) % 24)
     return `${days} days ${hours} hours left`
-  }, [now])
+  }, [now, settings.event.dateTime])
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
   function validate() {
+    if (!settings.rsvpOpen) return 'RSVP is currently closed by host.'
     if (deadlinePassed) return 'RSVP is closed. Deadline has passed.'
     if (!form.name.trim()) return 'Please provide guest name.'
     if (!phoneRegex.test(form.phone)) return 'Please provide a valid phone number.'
     if (!emailRegex.test(form.email)) return 'Please provide a valid email address.'
     if (form.honeypot) return 'Spam check failed.'
-    if (INVITE_ONLY && !INVITED_TOKENS.includes(form.token.trim())) {
+    if (settings.inviteOnly && !settings.invitedTokens.includes(form.token.trim())) {
       return 'Invite token is required for this event.'
     }
 
@@ -678,8 +927,8 @@ function App() {
       .filter((entry) => entry.attending === 'yes' && entry.id !== form.id)
       .reduce((sum, entry) => sum + Number(entry.adults) + Number(entry.children), 0)
     const incoming = form.attending === 'yes' ? Number(form.adults) + Number(form.children) : 0
-    if (currentAttending + incoming > MAX_CAPACITY) {
-      return `Capacity reached. Max allowed guests: ${MAX_CAPACITY}.`
+    if (currentAttending + incoming > Number(settings.maxCapacity)) {
+      return `Capacity reached. Max allowed guests: ${settings.maxCapacity}.`
     }
 
     const lastSubmit = Number(localStorage.getItem(LAST_SUBMIT_KEY) || '0')
@@ -725,7 +974,7 @@ function App() {
     localStorage.setItem(LAST_SUBMIT_KEY, String(Date.now()))
     const link = `${appUrl}?edit=${entryId}&token=${encodeURIComponent(token)}`
     setEditLink(link)
-    setConfirmation('Thank you! Your RSVP has been recorded.')
+    setConfirmation(settings.confirmationMessage || DEFAULT_SETTINGS.confirmationMessage)
     setForm((prev) => ({ ...INITIAL_FORM, token: prev.token || token }))
   }
 
@@ -738,11 +987,12 @@ function App() {
           element={
             <RsvpPage
               lang={lang}
-              setLang={setLang}
+              settings={settings}
               form={form}
               error={error}
               confirmation={confirmation}
               editLink={editLink}
+              rsvpClosed={rsvpClosed}
               deadlinePassed={deadlinePassed}
               countdown={countdown}
               appUrl={appUrl}
@@ -751,7 +1001,17 @@ function App() {
             />
           }
         />
-        <Route path="/admin" element={<AdminPage submissions={submissions} setSubmissions={setSubmissions} />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminPage
+              submissions={submissions}
+              setSubmissions={setSubmissions}
+              settings={settings}
+              setSettings={setSettings}
+            />
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ThemeProvider>
