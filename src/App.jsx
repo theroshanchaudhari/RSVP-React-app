@@ -260,16 +260,10 @@ function RsvpPage({
                 </Typography>
               </Box>
 
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                <Button variant={lang === 'en' ? 'contained' : 'outlined'} onClick={() => setLang('en')}>English</Button>
-                <Button variant={lang === 'hi' ? 'contained' : 'outlined'} onClick={() => setLang('hi')}>Hindi</Button>
-                <Button variant={lang === 'gu' ? 'contained' : 'outlined'} onClick={() => setLang('gu')}>Gujarati</Button>
-              </Stack>
-
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
                 <Button component="a" href={whatsappShare} target="_blank" rel="noreferrer">Share on WhatsApp</Button>
-                <Button component="a" href={calendarLink} target="_blank" rel="noreferrer" variant="outlined">Add to Calendar</Button>
-                <Button component={RouterLink} to="/admin" color="secondary">Admin Dashboard</Button>
+                {/* <Button component="a" href={calendarLink} target="_blank" rel="noreferrer" variant="outlined">Add to Calendar</Button>
+                <Button component={RouterLink} to="/admin" color="secondary">Admin Dashboard</Button> */}
               </Stack>
             </Stack>
           </CardContent>
